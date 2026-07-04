@@ -1,6 +1,6 @@
 {
   "name": "@myko.pk/health",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Health check module for MYKO NestJS services",
   "type": "module",
   "exports": {

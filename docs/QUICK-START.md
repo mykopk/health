@@ -6,7 +6,7 @@
 npm install @myko.pk/health
 ```
 
-## 1. Register Static Checks
+## 1. Health Checks
 
 ```ts
 import { Module } from '@nestjs/common';
@@ -25,51 +25,80 @@ import { HealthModule } from '@myko.pk/health';
 export class AppModule {}
 ```
 
-Access `GET /health` to get:
+`GET /health` → `200` with `"Service healthy"` or `503` with `"Service degraded"`.
 
-```json
-{
-  "success": true,
-  "statusCode": 200,
-  "message": "Service healthy",
-  "data": {
-    "name": "myko-app",
-    "uptime": 3600,
-    "checks": [
-      { "name": "server", "status": "up" },
-      { "name": "database", "status": "up" }
-    ]
-  },
-  "timestamp": "2026-07-04T12:00:00.000Z"
-}
-```
-
-## 2. Register with Dependency Injection
+## 2. System Metrics
 
 ```ts
-import { HealthModule } from '@myko.pk/health';
-import { RedisService } from '@myko/common-packages/cache/redis';
+import { Module } from '@nestjs/common';
+import { MetricsModule } from '@myko.pk/health';
 
 @Module({
   imports: [
-    HealthModule.forRootAsync({
-      imports: [RedisModule],
-      inject: [RedisService],
-      useFactory: (redis: RedisService) => [
-        { name: 'redis', check: () => redis.ping() },
-      ],
-    }),
+    MetricsModule.forRoot(),
   ],
 })
 export class AppModule {}
 ```
 
-## 3. Response Format
+`GET /metrics` returns CPU, memory, process & OS info:
 
-- All checks `up` → `200` with `"Service healthy"`
-- Any check `down` → `503` with `"Service degraded"`
-- Response is wrapped in `ApiResponse` via `@myko.pk/response`
+```json
+{
+  "success": true,
+  "data": {
+    "system": {
+      "cpu": { "usage": 34.2, "loads": [1.5, 0.8, 0.6] },
+      "memory": { "total": 16777216000, "free": 8388608000, "used": 8388608000, "heapUsed": 512000000, "heapTotal": 1024000000 },
+      "process": { "uptime": 3600, "pid": 12345, "nodeVersion": "v22.0.0" },
+      "os": { "hostname": "my-server-1", "platform": "darwin", "uptime": 99999 }
+    },
+    "custom": {}
+  }
+}
+```
+
+## 3. Custom Metrics
+
+Track application-specific values:
+
+```ts
+MetricsModule.forRoot({
+  customMetrics: [
+    {
+      name: 'active_connections',
+      help: 'Number of active WebSocket connections',
+      collect: () => wsServer.clients.size,
+    },
+    {
+      name: 'db_pool_size',
+      help: 'Current database connection pool size',
+      collect: () => dbPool.totalCount,
+    },
+  ],
+})
+```
+
+Custom metrics appear under `data.custom` in the `/metrics` response.
+
+## 4. Async Setup (with DI)
+
+```ts
+MetricsModule.forRootAsync({
+  imports: [DatabaseModule],
+  inject: [DatabaseService],
+  useFactory: (db: DatabaseService) => ({
+    customMetrics: [
+      {
+        name: 'db_pool_size',
+        help: 'Database connection pool size',
+        collect: () => db.getPoolSize(),
+      },
+    ],
+  }),
+})
+```
 
 ## What's Next?
 
-See the [full README](../README.md) for the complete API reference.
+- [README.md](../README.md) — full API reference

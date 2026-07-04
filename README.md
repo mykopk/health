@@ -1,7 +1,7 @@
 <p align="center">
   <h1 align="center">@myko.pk/health</h1>
-  <p align="center"><strong>Health checks. Standardised.</strong></p>
-  <p align="center">Health check module for MYKO NestJS services. Provides a standardised `/health` endpoint with configurable health checks and a dynamic module API.</p>
+  <p align="center"><strong>Health checks. Metrics. Standardised.</strong></p>
+  <p align="center">Observability toolkit for MYKO NestJS services. Health checks, system metrics, and custom metric tracking — all wrapped in a standard `ApiResponse` envelope.</p>
   <p align="center">
     <a href="https://www.npmjs.com/package/@myko.pk/health"><img src="https://img.shields.io/npm/v/@myko.pk/health?style=for-the-badge&logo=npm&logoColor=white" alt="npm version"></a>
     <a href="https://www.npmjs.com/package/@myko.pk/health"><img src="https://img.shields.io/npm/dm/@myko.pk/health?style=for-the-badge&logo=npm&logoColor=white" alt="npm downloads"></a>
@@ -19,7 +19,10 @@
 - [Description](#description)
 - [Key Features](#key-features)
 - [Quick Start](#quick-start)
-- [API](#api)
+- [Modules](#modules)
+  - [HealthModule](#healthmodule)
+  - [MetricsModule](#metricsmodule)
+- [API Reference](#api-reference)
 - [Available Scripts](#available-scripts)
 - [Contributors](#contributors)
 - [Contributing](#contributing)
@@ -27,20 +30,31 @@
 
 ## 📝 Description
 
-@myko.pk/health provides a standardised health check endpoint for NestJS services. Register one or more `HealthCheck` callbacks and the module exposes a `GET /health` endpoint that runs all checks and returns a unified `ApiResponse` envelope via `@myko.pk/response`.
+@myko.pk/health is an observability toolkit for MYKO NestJS services. It provides:
+
+- **Health checks** — register one or more check functions and get a standardised `/health` endpoint
+- **System metrics** — automatic CPU, memory, process, and OS metrics at `/metrics`
+- **Custom metrics** — track your own application-specific values (connections, queue depth, pool sizes, etc.)
+
+All responses use the standard `@myko.pk/response` `ApiResponse` envelope.
 
 ## ✨ Key Features
 
-- **🩺 Configurable Health Checks** — Register sync or async check functions per dependency (database, redis, etc.)
-- **🏗️ Dynamic Module API** — `forRoot(checks)` or `forRootAsync({ inject, useFactory })` for dependency injection
-- **📦 Standard Response** — Returns `ApiResponse` via `@myko.pk/response` with per-check `up`/`down` status
-- **📘 Fully Typed** — Full TypeScript support with typed health check interfaces
+- **🩺 Health Checks** — Register sync or async check functions per dependency (database, redis, etc.)
+- **📊 System Metrics** — Automatic CPU usage, load averages, memory (total/free/used/heap), process info, OS info
+- **⚙️ Custom Metrics** — Define your own numeric metrics with a `collect` callback
+- **🏗️ Dynamic Modules** — `forRoot()` and `forRootAsync()` for both HealthModule and MetricsModule
+- **📦 Standard Response** — All endpoints return `ApiResponse` via `@myko.pk/response`
+- **📘 Fully Typed** — Full TypeScript support with interfaces for all metric types
+- **🔋 Zero Extra Dependencies** — Metrics use only Node.js built-in `node:os` and `process`
 
 ## ⚡ Quick Start
 
 ```bash
 npm install @myko.pk/health
 ```
+
+### Health Checks
 
 ```ts
 import { Module } from '@nestjs/common';
@@ -49,50 +63,104 @@ import { HealthModule } from '@myko.pk/health';
 @Module({
   imports: [
     HealthModule.forRoot([
-      {
-        name: 'database',
-        check: async () => {
-          // return true/false
-        },
-      },
-      {
-        name: 'redis',
-        check: () => redis.ping(),
-      },
+      { name: 'database', check: async () => { /* return true/false */ } },
+      { name: 'redis',    check: () => redis.ping() },
     ]),
   ],
 })
 export class AppModule {}
 ```
 
-Or with async factory:
+Access `GET /health`:
 
-```ts
-HealthModule.forRootAsync({
-  inject: [RedisService],
-  useFactory: (redis: RedisService) => [
-    { name: 'redis', check: () => redis.ping() },
-  ],
-})
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Service healthy",
+  "data": {
+    "name": "myko-app",
+    "uptime": 3600,
+    "checks": [
+      { "name": "database", "status": "up" },
+      { "name": "redis",    "status": "up" }
+    ]
+  },
+  "timestamp": "2026-07-04T12:00:00.000Z"
+}
 ```
 
-## API
+### System + Custom Metrics
 
-### `HealthModule.forRoot(checks)`
+```ts
+import { Module } from '@nestjs/common';
+import { MetricsModule } from '@myko.pk/health';
 
-| Param | Type | Description |
-|-------|------|-------------|
-| `checks` | `HealthCheck[]` | Array of health checks with `name` and `check` function |
+@Module({
+  imports: [
+    MetricsModule.forRoot({
+      customMetrics: [
+        {
+          name: 'active_connections',
+          help: 'Active WebSocket connections',
+          collect: () => wsServer.clients.size,
+        },
+      ],
+    }),
+  ],
+})
+export class AppModule {}
+```
 
-### `HealthModule.forRootAsync(options)`
+Access `GET /metrics`:
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `imports` | `any[]` | Modules to import for DI |
-| `inject` | `any[]` | Providers to inject into factory |
-| `useFactory` | `(...args) => HealthCheck[]` | Factory returning checks |
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Metrics collected",
+  "data": {
+    "system": {
+      "cpu": {
+        "usage": 34.2,
+        "loads": [1.5, 0.8, 0.6]
+      },
+      "memory": {
+        "total": 16777216000,
+        "free": 8388608000,
+        "used": 8388608000,
+        "heapUsed": 512000000,
+        "heapTotal": 1024000000
+      },
+      "process": {
+        "uptime": 3600,
+        "pid": 12345,
+        "nodeVersion": "v22.0.0"
+      },
+      "os": {
+        "hostname": "my-server-1",
+        "platform": "darwin",
+        "uptime": 99999
+      }
+    },
+    "custom": {
+      "active_connections": 42
+    }
+  },
+  "timestamp": "2026-07-04T12:00:00.000Z"
+}
+```
 
-### `HealthCheck`
+## Modules
+
+### HealthModule
+
+| Method | Description |
+|--------|-------------|
+| `forRoot(checks)` | Register health checks synchronously |
+| `forRootAsync(options)` | Register health checks with dependency injection |
+
+**`HealthCheck`**:
 
 ```ts
 interface HealthCheck {
@@ -100,6 +168,71 @@ interface HealthCheck {
   check: () => Promise<boolean> | boolean;
 }
 ```
+
+**`HealthModule.forRootAsync`**:
+
+```ts
+HealthModule.forRootAsync({
+  imports: [RedisModule],
+  inject: [RedisService],
+  useFactory: (redis: RedisService) => [
+    { name: 'redis', check: () => redis.ping() },
+  ],
+})
+```
+
+### MetricsModule
+
+| Method | Description |
+|--------|-------------|
+| `forRoot(options)` | Register metrics collection with optional custom metrics |
+| `forRootAsync(options)` | Register metrics collection with dependency injection |
+
+**`MetricsModuleOptions`**:
+
+```ts
+interface MetricsModuleOptions {
+  customMetrics?: CustomMetricDefinition[];
+}
+```
+
+**`CustomMetricDefinition`**:
+
+```ts
+interface CustomMetricDefinition {
+  name: string;
+  help: string;
+  collect: () => number | Promise<number>;
+}
+```
+
+## API Reference
+
+### Endpoints
+
+| Method | Path | Description | Module |
+|--------|------|-------------|--------|
+| GET | `/health` | Run all health checks, return aggregate status | HealthModule |
+| GET | `/metrics` | Collect system + custom metrics | MetricsModule |
+
+### Types
+
+| Type | Description |
+|------|-------------|
+| `SystemMetrics` | CPU, memory, process, OS metrics |
+| `CpuMetrics` | `usage` (%), `loads` [1m, 5m, 15m] |
+| `MemoryMetrics` | `total`, `free`, `used`, `heapUsed`, `heapTotal` |
+| `ProcessMetrics` | `uptime`, `pid`, `nodeVersion` |
+| `OsMetrics` | `hostname`, `platform`, `uptime` |
+| `CustomMetricDefinition` | User-defined metric with name, help, collect callback |
+| `MetricsResponse` | Combined system + custom metrics |
+
+### DI Tokens
+
+| Token | Description |
+|-------|-------------|
+| `HEALTH_CHECKS` | Injection token for registered health checks |
+| `CUSTOM_METRICS` | Injection token for custom metric definitions |
 
 ## 🚀 Available Scripts
 

@@ -6,14 +6,29 @@ Documentation for **@myko.pk/health**.
 
 | Document | Description |
 |----------|-------------|
-| [QUICK-START.md](./QUICK-START.md) | 5-minute setup guide — install, register checks, DI usage |
+| [QUICK-START.md](./QUICK-START.md) | 5-minute setup — health checks, metrics, custom metrics |
 
 ## Module Reference
 
-All public APIs are documented in the [README](../README.md):
+### HealthModule
 
-- **`HealthModule.forRoot(checks)`** — Register health checks synchronously
-- **`HealthModule.forRootAsync(options)`** — Register health checks with DI
-- **`HealthCheck`** — Interface: `{ name: string; check: () => boolean | Promise<boolean> }`
-- **`HealthCheckResult`** — Type: `{ name: string; status: 'up' | 'down' }`
-- **`HEALTH_CHECKS`** — Injection token `'HEALTH_CHECKS'`
+- **`forRoot(checks)`** — `HealthCheck[]` → DynamicModule
+- **`forRootAsync({ imports, inject, useFactory })`** — DynamicModule
+- **Endpoint**: `GET /health`
+
+### MetricsModule
+
+- **`forRoot({ customMetrics })`** → DynamicModule
+- **`forRootAsync({ imports, inject, useFactory })`** → DynamicModule
+- **Endpoint**: `GET /metrics`
+
+### Types
+
+| Type | File | Description |
+|------|------|-------------|
+| `HealthCheck` | `health.interface.ts` | `{ name, check }` |
+| `HealthCheckResult` | `health.interface.ts` | `{ name, status: 'up' | 'down' }` |
+| `HealthResponse` | `health.interface.ts` | `{ status, uptime, timestamp, checks }` |
+| `SystemMetrics` | `metrics.interface.ts` | CPU, memory, process, OS |
+| `CustomMetricDefinition` | `metrics.interface.ts` | `{ name, help, collect }` |
+| `MetricsResponse` | `metrics.interface.ts` | `{ system, custom }` |
