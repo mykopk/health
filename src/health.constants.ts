@@ -1,0 +1,1 @@
+export const HEALTH_CHECKS = 'HEALTH_CHECKS';
