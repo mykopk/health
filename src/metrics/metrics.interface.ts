@@ -33,7 +33,8 @@ export interface SystemMetrics {
 export interface CustomMetricDefinition {
   name: string;
   help: string;
-  collect: () => number | Promise<number>;
+  labelNames?: string[];
+  collect: () => number | Record<string, number> | Promise<number> | Promise<Record<string, number>>;
 }
 
 export interface CustomMetricsCollection {

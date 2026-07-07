@@ -1,22 +1,31 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { Controller, Get, Inject, Req } from '@nestjs/common';
-import { Request } from 'express';
+import type { Request } from 'express';
 import { ResponseBuilder } from '@myko.pk/response';
 import { HEALTH_CHECKS } from './health.constants';
-import { HealthCheck } from './health.interface';
+import type { HealthCheck, HealthCheckReturn } from './health.interface';
 
 @Controller('health')
 export class HealthController {
-  private readonly appName: string;
+  private _appName: string | null = null;
 
   constructor(
     @Inject(HEALTH_CHECKS) private readonly checks: HealthCheck[],
-  ) {
-    try {
-      const pkg = require(process.cwd() + '/package.json');
-      this.appName = pkg.name || 'unknown';
-    } catch {
-      this.appName = 'unknown';
+  ) {}
+
+  private getAppName(): string {
+    if (this._appName === null) {
+      try {
+        const pkg = JSON.parse(
+          readFileSync(join(process.cwd(), 'package.json'), 'utf-8'),
+        ) as { name?: string };
+        this._appName = pkg.name || 'unknown';
+      } catch {
+        this._appName = 'unknown';
+      }
     }
+    return this._appName;
   }
 
   @Get()
@@ -24,8 +33,15 @@ export class HealthController {
     const results = await Promise.all(
       this.checks.map(async (c) => {
         try {
-          const ok = await c.check();
-          return { name: c.name, status: ok ? 'up' as const : 'down' as const };
+          const raw: HealthCheckReturn = await c.check();
+          if (typeof raw === 'object' && raw !== null) {
+            return {
+              name: c.name,
+              status: raw.status ? 'up' as const : 'down' as const,
+              ...(raw.detail ? { detail: raw.detail } : {}),
+            };
+          }
+          return { name: c.name, status: raw ? 'up' as const : 'down' as const };
         } catch {
           return { name: c.name, status: 'down' as const };
         }
@@ -36,7 +52,7 @@ export class HealthController {
 
     return ResponseBuilder.success(
       {
-        name: this.appName,
+        name: this.getAppName(),
         uptime: process.uptime(),
         checks: results,
       },

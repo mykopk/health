@@ -1,0 +1,146 @@
+{
+  "title": "Redis & Rate Limiting",
+  "description": "Production dashboard for Redis health, circuit breaker, cache performance, and rate limiting metrics. Requires Prometheus scraping the /metrics endpoint with Accept: text/plain.",
+  "tags": ["redis", "rate-limiting", "nestjs", "myko"],
+  "timezone": "browser",
+  "panels": [
+    {
+      "title": "Circuit Breaker State",
+      "type": "stat",
+      "description": "Current circuit breaker state: 0=CLOSED, 1=HALF_OPEN, 2=OPEN",
+      "targets": [
+        {
+          "expr": "redis_circuit_state",
+          "legendFormat": "Circuit State"
+        }
+      ],
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 }
+    },
+    {
+      "title": "P99 Redis Latency",
+      "type": "graph",
+      "description": "P99 latency of Redis operations in milliseconds. Above 500ms triggers load shedding.",
+      "targets": [
+        {
+          "expr": "redis_circuit_p99_ms",
+          "legendFormat": "P99 Latency"
+        }
+      ],
+      "gridPos": { "h": 4, "w": 8, "x": 4, "y": 0 },
+      "yaxes": [
+        { "format": "ms", "label": "Latency" },
+        { "format": "short" }
+      ]
+    },
+    {
+      "title": "Circuit Opens Total",
+      "type": "graph",
+      "description": "Cumulative circuit opens over time. Spikes indicate Redis outages.",
+      "targets": [
+        {
+          "expr": "rate(redis_circuit_opens_total[5m])",
+          "legendFormat": "Opens/sec"
+        }
+      ],
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 }
+    },
+    {
+      "title": "Recoveries After Open",
+      "type": "graph",
+      "description": "Successful recoveries after circuit was open (HALF_OPEN → CLOSED).",
+      "targets": [
+        {
+          "expr": "rate(redis_circuit_successes_after_open_total[5m])",
+          "legendFormat": "Recoveries/sec"
+        }
+      ],
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 }
+    },
+    {
+      "title": "Cache Hit Ratio",
+      "type": "graph",
+      "description": "Cache hit ratio percentage. Lower values indicate cache misses driving DB load.",
+      "targets": [
+        {
+          "expr": "redis_cache_hit_ratio",
+          "legendFormat": "Hit Ratio"
+        }
+      ],
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 4 },
+      "yaxes": [
+        { "format": "percent", "min": 0, "max": 100 },
+        { "format": "short" }
+      ]
+    },
+    {
+      "title": "Cache Hits / Misses",
+      "type": "graph",
+      "description": "Rate of cache hits vs misses per second.",
+      "targets": [
+        {
+          "expr": "rate(redis_cache_hits_total[5m])",
+          "legendFormat": "Hits/sec"
+        },
+        {
+          "expr": "rate(redis_cache_misses_total[5m])",
+          "legendFormat": "Misses/sec"
+        }
+      ],
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 4 }
+    },
+    {
+      "title": "LRU Cache Size",
+      "type": "stat",
+      "description": "Current in-memory LRU cache entry count (max 2000).",
+      "targets": [
+        {
+          "expr": "redis_lru_size",
+          "legendFormat": "LRU Entries"
+        }
+      ],
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 4 }
+    },
+    {
+      "title": "Rate Limit Checks",
+      "type": "graph",
+      "description": "Rate-limit sliding window checks per second.",
+      "targets": [
+        {
+          "expr": "rate(rate_limit_checks_total[5m])",
+          "legendFormat": "Checks/sec"
+        }
+      ],
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 8 }
+    },
+    {
+      "title": "Lock Acquisitions",
+      "type": "graph",
+      "description": "Distributed lock acquire success vs failure rate.",
+      "targets": [
+        {
+          "expr": "rate(redis_lock_acquires_total[5m])",
+          "legendFormat": "Acquires/sec"
+        },
+        {
+          "expr": "rate(redis_lock_failures_total[5m])",
+          "legendFormat": "Failures/sec"
+        }
+      ],
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 8 }
+    },
+    {
+      "title": "HALF_OPEN Probes",
+      "type": "graph",
+      "description": "Circuit breaker probe requests while in HALF_OPEN state.",
+      "targets": [
+        {
+          "expr": "rate(redis_circuit_half_open_probes_total[5m])",
+          "legendFormat": "Probes/sec"
+        }
+      ],
+      "gridPos": { "h": 4, "w": 6, "x": 16, "y": 8 }
+    }
+  ],
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" }
+}

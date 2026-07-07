@@ -31,7 +31,8 @@ export class MetricsService {
     const result: Record<string, number> = {};
     for (const metric of this.customMetrics) {
       try {
-        result[metric.name] = await metric.collect();
+        const value = await metric.collect();
+        result[metric.name] = typeof value === 'number' ? value : sumValues(value);
       } catch {
         result[metric.name] = -1;
       }
@@ -97,4 +98,10 @@ export class MetricsService {
       uptime: os.uptime(),
     };
   }
+}
+
+function sumValues(record: Record<string, number>): number {
+  let sum = 0;
+  for (const v of Object.values(record)) sum += v;
+  return sum;
 }
